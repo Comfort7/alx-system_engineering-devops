@@ -1,0 +1,5 @@
+#!/bin/bash
+
+echo "Users and their Home Directories:"
+awk -F: '{print "User: " $1 "\tHome Directory: " $6}' /etc/passwd | sort
+
