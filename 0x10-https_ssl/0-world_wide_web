@@ -1,16 +1,44 @@
 #!/usr/bin/env bash
-# print domains and subdomains
+# Script to print information about subdomains of a domain
 
-print_domain_subdomain () {
-    dig "$1" | grep -A1 'ANSWER SECTION:' | sed -r "s/$1./$2/g" | awk -F" " ' NR==2 { print "The subdomain " $1 " is a " $4 " record and points to " $5 }'
+print_domain_subdomain() {
+    local domain="$1"
+    local subdomain="$2"
+    local full_domain="$subdomain.$domain"
+    
+    # Check if domain exists
+    if ! dig +short "$full_domain" &> /dev/null; then
+        echo "Error: Domain $full_domain does not exist."
+        exit 1
+    fi
+    
+    # Get information about the subdomain
+    dig_output=$(dig "$full_domain" | awk '/^;; ANSWER SECTION:/{y=1;next}y')
+    if [ -z "$dig_output" ]; then
+        echo "Error: Subdomain $subdomain does not exist."
+        exit 1
+    fi
+    
+    # Print information about the subdomain
+    echo "$dig_output" | awk -v subdomain="$subdomain" -v domain="$domain" '
+        NR==1 { subdomain = subdomain "."; domain = domain "." }
+        { sub(" " domain, " " subdomain) }
+        NR==1 { print "The subdomain " $1 " is a " $4 " record and points to " $5 }
+    '
 }
 
-if [ "$#" -eq 2 ]
-then
-    print_domain_subdomain "$2.$1" "$2"
+# Check if the correct number of arguments is provided
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+    echo "Usage: $0 <domain> [subdomain]"
+    exit 1
+fi
+
+# Main
+if [ "$#" -eq 2 ]; then
+    print_domain_subdomain "$1" "$2"
 else
-    print_domain_subdomain "www.$1" "www"
-    print_domain_subdomain "lb-01.$1" "lb-01"
-    print_domain_subdomain "web-01.$1" "web-01"
-    print_domain_subdomain "web-02.$1" "web-02"
+    print_domain_subdomain "$1" "www"
+    print_domain_subdomain "$1" "lb-01"
+    print_domain_subdomain "$1" "web-01"
+    print_domain_subdomain "$1" "web-02"
 fi
